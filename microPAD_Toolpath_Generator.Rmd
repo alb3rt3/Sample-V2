@@ -1,0 +1,203 @@
+---
+title: "microPAD Toolpath Generator"
+author: "Albert Hernandez"
+date: "3/23/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Check Working Directory (Change if Needed)
+```{r}
+
+# Currently, all files are shared in a google drive with the following path:
+
+# G:/Shared drives/Medical Device Projects/microPAD Toolpath
+
+getwd()
+
+setwd("G:/Shared drives/Medical Device Projects/microPAD Toolpath")
+
+# Currently only Daniel and I can access the directory, but once it is uploaded on Github, you can download and put the files anywhere you want
+
+# You can change the directory here using setwd() or change in "Files -> More -> set as working directory" in Bottom Right box 
+
+```
+# User Defined Inputs
+```{r}
+
+# This tells us our Matrix Size
+
+set_matrix = readline(prompt = "Enter microPAD Matrix as #x#: ");
+```
+
+
+```{r}
+
+# This sets our movement speed
+
+set_feed = readline("Set Feedrate as F#.0: ")  # Max of F4000.0
+```
+
+```{r}
+
+# This sets our height from the paper, this is where we will deposit our droplet
+
+set_heightdeposit = readline("Set Height Deposit as Z#.#: ") # units in mm
+```
+
+```{r}
+
+# This sets our height from the paper, this is where we will move from one well to another
+
+set_heightrest = readline("Set Height Rest as R#.#: ") # units in mm
+```
+
+# Read in Data
+```{r}
+
+# Read in coordinate data from text file (exported from excel sheet)
+
+data <- read.table("sampleTable3.txt", header=TRUE)
+
+```
+
+# Toolpath Generator (Setup)
+```{r}
+
+title_ <- paste("(UCCNC 100: Toolpath Generator for ", set_matrix," microPAD)", sep = ""); 
+  
+a <- "\n;
+(Material Size);
+(X = NA; Y = NA; Z = NA);
+;
+(Program Units: millimeters, mm);
+;
+(Toolpaths used in this File);
+(NA);
+;
+(Tools used in this file);
+(NA);
+;
+(Under Configuration -> General Settings: On tool change code (06M) do the following: Set to Stop spindle and wait for cycle START)
+;
+#######(GCODE)#######;
+;
+(Initializing and Zero Everything);
+;
+G00 G17 G90 G40 G49 G54 G80 X0.0 Y0.0; 
+;
+(NO TOOLS - USE M6 for buffer to do Tool Change);
+(I will manually adjust height but if capillary is at constant secure distance, we can program offset as if it were a tool using 43G);
+;
+(Setting Dwell time or Tool Change);
+;
+M06;
+;
+(Move up 25mm from the Zero Position);
+;
+G00 Z25.0; 
+;
+(Setting Feedrate: the movement speed)
+;\n"
+
+feedrate_ <- paste("G94 ",set_feed, sep = ""); 
+
+a1 = "\n;
+(If issues, cancel the cycle (CYCLE STOP) from here, otherwise start the cycle (CYCLE START))
+;
+M06;
+;
+(Determine how much distance above the well plate or vial you want to be positioned, this will be our default height to return to); 
+;\n"
+
+heightdeposit_ <- paste("G00 ",set_heightdeposit, sep = ""); 
+
+a2 = "\n;
+(If incorrect height, cancel the cycle (CYCLE STOP) from here, otherwise start the cycle (CYCLE START));
+;
+M06;
+;
+(Now we can confidently program our canned cycle);
+;
+(Move to first vial position);
+;\n"
+
+first_coord <- paste(as.character(data$Ycoord[1]),as.character(data$Xcoord[1]))
+
+a3 = "\n;
+(Reposition capillary if needed); 
+;
+M06;
+;\n"
+
+can_cycle <- paste("G86 G99",set_heightrest,set_heightdeposit,set_feed)
+
+a4 <- "\n;
+(R imples R plane: give it previous Z value; new Z value is how deep into vial/well plate it will go);
+;\n"
+
+intro_ <- paste(title_,a,feedrate_,a1,heightdeposit_,a2,first_coord,a3,can_cycle,a4)
+
+a5 = "\nG80;
+M0;"
+
+```
+
+# For every other y use the Reverse X-coordinates
+```{r}
+
+# don't want length of x_index where it is 0
+x_red <- which(data$X_index != 0)
+x_red_ind <- data$Xcoord[x_red]
+a <- length(data$Y_index)*length(x_red_ind) # vector size
+
+# DON'T WANT THE FIRST VALUE SINCE YCOORD ALREADY MOVES TO FIRST X COORD
+temp <- 1:(length(x_red_ind)-1)
+v <- 0
+
+for (i in 1:(length(data$Y_index))) {
+  
+  if (data$Y_index[i]%% 2 == 1) {
+    
+    for (j in 1:(length(x_red_ind)-1)) {
+    
+      temp[j] = data$Xcoord[j+1]
+      # DON'T WANT THE FIRST VALUE SINCE YCOORD ALREADY MOVES TO FIRST X COORD
+    }
+    
+  }
+  
+  else if (data$Y_index[i]%% 2 == 0) {
+    
+    for (j in 1:(length(x_red_ind)-1)) {
+    
+      temp[j] = data$Rev_Xcoord[j+1]
+      # DON'T WANT THE FIRST VALUE SINCE YCOORD ALREADY MOVES TO FIRST X COORD
+    }
+    
+  }
+  
+  v= c(v,data$Ycoord[i],temp) # concatenate after each loop
+  
+}
+temp
+v <- v[-1] # removing the zero (0) that we initialized with
+v <- v[-1] # removing the first y coordinate because we already positioned it to the first well
+v <- t(v)
+
+toolpath_ <- c(intro_,v,a5) # combine characters to make tool path
+
+write.table(toolpath_, file = "samplePath3.txt", row.names = FALSE, col.names = FALSE) # export toolpath as text file
+
+# Future Improvements or Points to Consider
+
+# 1. The text file contains all our coordinates as characters so each value is surrounded by quotations ""
+# For cleanliness, I removed them but you don't have to: they are not a recognized symbol so UCCNC ignores them,
+# Therefore, you can directly import the coordinates. 
+
+# 2. The first two coordinates (first y and X) in each set is the first position of our row, so 
+# consider modifying code such that the first two entries are combined as one character when exporting
+# So we can directly copy and paste without having to edit the created text file
+
+```
