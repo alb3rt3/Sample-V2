@@ -1,10 +1,10 @@
 ---
-title: "microPAD Toolpath Generator"
-author: "Albert Hernandez"
-date: "3/23/2022"
-output: html_document
-editor_options: 
-  chunk_output_type: console
+Title: "microPAD Toolpath Generator"
+Author: Albert Hernandez (alb3rthernandez@gmail.com)
+date: 3/23/2022 Edited by:
+Input file: .txt file
+Output: html_document, .txt file
+Dependencies:
 ---
 
 # Check Working Directory (Change if Needed)
@@ -58,7 +58,7 @@ set_heightrest = readline("Set Height Rest as R#.#: ") # units in mm
 
 # Read in coordinate data from text file (exported from excel sheet)
 
-data <- read.table("sampleTable3.txt", header=TRUE)
+data <- read.table("sampleTable.txt", header=TRUE)
 
 ```
 
@@ -185,19 +185,11 @@ temp
 v <- v[-1] # removing the zero (0) that we initialized with
 v <- v[-1] # removing the first y coordinate because we already positioned it to the first well
 v <- t(v)
+```
 
+# Create Toolpath
+```{r}
 toolpath_ <- c(intro_,v,a5) # combine characters to make tool path
 
-write.table(toolpath_, file = "samplePath3.txt", row.names = FALSE, col.names = FALSE) # export toolpath as text file
-
-# Future Improvements or Points to Consider
-
-# 1. The text file contains all our coordinates as characters so each value is surrounded by quotations ""
-# For cleanliness, I removed them but you don't have to: they are not a recognized symbol so UCCNC ignores them,
-# Therefore, you can directly import the coordinates. 
-
-# 2. The first two coordinates (first y and X) in each set is the first position of our row, so 
-# consider modifying code such that the first two entries are combined as one character when exporting
-# So we can directly copy and paste without having to edit the created text file
-
+write.table(toolpath_, file = "samplePath.txt", row.names = FALSE, col.names = FALSE) # export toolpath as text file
 ```
